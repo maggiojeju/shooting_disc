@@ -278,6 +278,33 @@ const Sync = {
   emit(){ this.cbs.forEach(cb => cb(this.tree)); }
 };
 
+/* ---------- 작품 사진 저장소 (방 데이터와 따로 불러와요) ---------- */
+const Photos = {
+  data: {}, ver: 0, started: false, ref: null, key: "",
+  start(){
+    if(this.started || !Sync.room) return; this.started = true;
+    const path = Sync.room + "__photos";
+    if(Sync.mode === "firebase"){
+      this.ref = firebase.database().ref("rooms/" + path);
+      this.ref.on("value", snap => { this.data = snap.val() || {}; this.ver++; render(); });
+      return;
+    }
+    this.key = "sd_room_" + path;
+    const load = () => { this.data = LS.get(this.key, {}); this.ver++; render(); };
+    try{ this.bc = new BroadcastChannel(this.key); this.bc.onmessage = load; }catch(e){}
+    window.addEventListener("storage", ev => { if(ev.key === this.key) load(); });
+    setTimeout(load, 0);
+  },
+  set(id, val){
+    if(Sync.mode === "firebase"){ this.ref.child(id).set(val === undefined ? null : val); return; }
+    const d = LS.get(this.key, {}); if(val === null || val === undefined) delete d[id]; else d[id] = val;
+    try{ localStorage.setItem(this.key, JSON.stringify(d)); }catch(e){ toast("저장 공간이 부족해요"); return; }
+    if(this.bc) this.bc.postMessage(1);
+    this.data = d; this.ver++; render();
+  },
+  clear(){ if(Sync.mode === "firebase") this.ref.set(null); else { localStorage.removeItem(this.key); if(this.bc) this.bc.postMessage(1); this.data = {}; this.ver++; render(); } }
+};
+
 /* ---------- 수업 구성 (챕터) ---------- */
 const CHAPTERS = [
   {id:"welcome",  grp:"1교시", icon:"👋", name:"시작"},
@@ -290,6 +317,7 @@ const CHAPTERS = [
   {id:"build",    grp:"1교시", icon:"🔧", name:"조립하기"},
   {id:"test",     grp:"1교시", icon:"🚀", name:"첫 비행 & 고치기"},
   {id:"decorate", grp:"1교시", icon:"🎨", name:"꾸미기"},
+  {id:"award",    grp:"2교시", icon:"🏅", name:"꾸미기 시상식"},
   {id:"rules",    grp:"2교시", icon:"🦺", name:"대회 규칙"},
   {id:"contest",  grp:"2교시", icon:"🏆", name:"멀리 보내기 대회"},
   {id:"mission",  grp:"2교시", icon:"🔬", name:"과학자 미션"},
@@ -529,6 +557,7 @@ V.intro = () => {
       <li><b>첫 비행</b> — 잘 나는지 시험하고 고치기</li>
       <li><b>꾸미기</b> — 나만의 슈팅디스크</li></ol></div>
     <div class="card"><h2>2교시 <span class="tag">40분</span></h2><ol>
+      <li><b>꾸미기 시상식</b> — 작품 사진 올리고 투표!</li>
       <li><b>대회 규칙</b> — 안전 약속</li>
       <li><b>멀리 보내기 대회</b> — 3번 도전!</li>
       <li><b>과학자 미션</b> — 실을 반대로 감으면?</li>
@@ -778,7 +807,126 @@ V.decorate = () => `<h1 class="title-xl">🎨 나만의 슈팅디스크 꾸미�
       <div class="warn big">스티커를 많이 붙이면 <b>무거워져서</b> 잘 안 날아요. 사인펜으로 그려요!</div>
       <div class="warn big">꾸민 뒤에 날개 각도를 다시 확인해요.</div>
       <div class="note big">🔬 실험: 링에 나선 무늬를 그리고 돌려 보면 어떻게 보일까요?</div></div>
-  </div>`;
+  </div>
+  ${role === "student" ? photoCard() : `<div class="card"><h3>📸 사진 올린 학생: <b>${Object.keys(Photos.data).length}</b> / ${Object.keys(students()).length}명</h3><div class="muted">다 꾸민 학생은 이 화면 아래에서 작품 사진을 올려요. 시상식은 [🏅 꾸미기 시상식] 화면에서 진행해요.</div></div>`}`;
+
+/* ---------- 꾸미기 시상식 ---------- */
+const okImg = v => typeof v === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(v);
+function awardState(){ return Object.assign({phase:"upload"}, S().award || {}); }
+function voteCounts(){
+  const c = {}; Object.values(students()).forEach(st => { if(st.vote && Photos.data[st.vote]) c[st.vote] = (c[st.vote] || 0) + 1; }); return c;
+}
+function photoList(){ // 익명 번호를 위해 일정한 순서로
+  return Object.entries(Photos.data).filter(([id, p]) => p && okImg(p.img)).sort((a, b) => (a[1].t || 0) - (b[1].t || 0)).map(([id, p], i) => ({id, no: i + 1, ...p}));
+}
+function photoCard(){
+  const mine = Photos.data[me.id];
+  const phase = awardState().phase;
+  return `<div class="card"><h2>📸 내 작품 사진 올리기</h2>
+    <div class="row" style="align-items:flex-start;gap:20px">
+      <div style="width:260px;height:200px;border-radius:16px;background:#f3ece2;display:grid;place-items:center;overflow:hidden;flex:none">
+        ${mine && okImg(mine.img) ? `<img src="${esc(mine.img)}" alt="내 작품" style="width:100%;height:100%;object-fit:cover">` : `<span class="muted">아직 사진이 없어요</span>`}</div>
+      <div style="flex:1;min-width:240px">
+        <p class="big" style="margin-top:0">다 꾸몄으면 슈팅디스크를 찍어서 올려요. <b>얼굴은 나오지 않게</b> 작품만 찍어요!</p>
+        ${phase === "result" ? `<div class="note">시상식 결과가 발표됐어요. 사진은 더 바꿀 수 없어요.</div>` : `<div class="row">
+          <button class="btn" data-act="camopen">📷 카메라로 찍기</button>
+          <label class="btn sec" style="cursor:pointer">🖼️ 사진 파일 고르기<input type="file" accept="image/*" data-act="photofile" style="display:none"></label></div>
+          ${mine ? `<div class="good" style="margin-top:10px">✅ 올렸어요! 다시 찍으면 바뀌어요.</div>` : ""}`}
+      </div></div></div>`;
+}
+V.award = () => {
+  const a = awardState(), list = photoList(), votes = voteCounts();
+  const nStu = Object.keys(students()).length, nVote = Object.values(students()).filter(st => st.vote && Photos.data[st.vote]).length;
+  const nameOf = id => { const st = students()[id] || Photos.data[id] || {}; return (st.num ? st.num + "번 " : "") + (st.name || ""); };
+  const phaseBar = `<div class="row" style="gap:6px;margin:4px 0 14px">${[["upload","① 사진 올리기"],["vote","② 투표"],["result","③ 결과 발표"]].map(([k, t]) => `<span class="tag" style="${a.phase === k ? "background:var(--pri);color:#fff" : ""}">${t}</span>`).join("")}</div>`;
+  // 결과 (시상대)
+  const ranked = list.map(p => ({...p, v: votes[p.id] || 0})).sort((x, y) => y.v - x.v || x.no - y.no);
+  const rankOf = p => 1 + ranked.filter(q => q.v > p.v).length;
+  const podium = () => {
+    const top = ranked.filter(p => p.v > 0 && rankOf(p) <= 3);
+    if(!top.length) return `<div class="center muted big" style="padding:30px">아직 투표가 없어요.</div>`;
+    const medal = r => ["🥇","🥈","🥉"][r - 1];
+    return `<div class="grid3">${top.map(p => `<div class="card center" style="border-color:${["#f5b301","#a7b1bd","#c98a52"][rankOf(p) - 1]};border-width:4px">
+      <div style="font-size:46px">${medal(rankOf(p))}</div><img src="${esc(p.img)}" alt="작품" style="width:100%;height:220px;object-fit:cover;border-radius:12px">
+      <div class="big" style="font-weight:900;margin-top:6px">${esc(nameOf(p.id))}</div><div class="muted big">${p.v}표</div></div>`).join("")}</div>`;
+  };
+  const tile = (p, opts = {}) => {
+    const mine = role === "student" && p.id === me.id;
+    const voted = role === "student" && myRec().vote === p.id;
+    const label = opts.showName ? esc(nameOf(p.id)) : `작품 ${p.no}번${mine ? " (내 작품)" : ""}`;
+    return `<div class="card" style="padding:10px;${voted ? "border-color:var(--pri);background:#fff4ec;" : ""}${mine && !opts.showName ? "opacity:.75;" : ""}">
+      <img src="${esc(p.img)}" alt="${label}" data-act="zoom" data-src="${esc(p.img)}" data-cap="${label}" style="width:100%;height:190px;object-fit:cover;border-radius:12px;cursor:zoom-in">
+      <div class="row" style="justify-content:space-between;margin-top:6px"><b>${label}</b>${opts.count ? `<span class="muted">${votes[p.id] || 0}표</span>` : ""}</div>
+      ${opts.vote && !mine ? `<button class="btn ${voted ? "" : "sec"} sm" style="width:100%;margin-top:6px" data-act="vote" data-v="${esc(p.id)}">${voted ? "❤️ 내가 고른 작품" : "🤍 이 작품에 투표"}</button>` : ""}
+      ${opts.del ? `<button class="btn sec sm" style="width:100%;margin-top:6px" data-act="delphoto" data-v="${esc(p.id)}">🗑️ 사진 지우기</button>` : ""}</div>`;
+  };
+  const gallery = (opts) => list.length ? `<div class="grid3">${list.map(p => tile(p, opts)).join("")}</div>` : `<div class="center muted big" style="padding:30px">아직 올라온 사진이 없어요.</div>`;
+
+  if(role === "teacher"){
+    const missing = Object.entries(students()).filter(([id]) => !Photos.data[id]).map(([id, st]) => esc((st.num ? st.num + "번 " : "") + st.name));
+    return `<h1 class="title-xl">🏅 꾸미기 시상식</h1>${phaseBar}
+      <div class="card"><div class="row">
+        <button class="btn ${a.phase === "upload" ? "" : "sec"}" data-act="aphase" data-v="upload">📸 사진 올리기</button>
+        <button class="btn ${a.phase === "vote" ? "" : "sec"}" data-act="aphase" data-v="vote">🗳️ 투표 시작</button>
+        <button class="btn ${a.phase === "result" ? "green" : "sec"}" data-act="aphase" data-v="result">🏆 결과 발표</button>
+        <span class="muted big" style="margin-left:auto">사진 <b>${list.length}</b> / ${nStu} · 투표 <b>${nVote}</b> / ${nStu}</span></div>
+        ${a.phase === "upload" && missing.length ? `<div class="muted" style="margin-top:8px">아직 안 올린 학생: ${missing.join(", ")}</div>` : ""}
+        ${a.phase === "vote" ? `<div class="note">투표는 익명이에요. 학생 화면에는 이름 대신 "작품 ○번"으로 보이고, 자기 작품에는 투표할 수 없어요. 한 사람당 1표이고 결과 발표 전까지 바꿀 수 있어요.</div>` : ""}</div>
+      ${a.phase === "result" ? `<h2>🎉 결과 발표</h2>${podium()}<h3 style="margin-top:20px">모든 작품</h3>${gallery({showName:true, count:true})}`
+        : gallery({showName:true, count: a.phase === "vote", del:true})}
+      <div class="row" style="margin-top:14px"><button class="btn sec sm" data-act="resetaward">🧹 사진·투표 모두 지우기</button></div>`;
+  }
+  // 학생
+  if(a.phase === "upload") return `<h1 class="title-xl">🏅 꾸미기 시상식</h1>${phaseBar}${photoCard()}
+      <div class="card"><h3>지금까지 올라온 작품 ${list.length}개</h3><div class="muted big">모두 올리면 선생님이 투표를 시작해요!</div></div>`;
+  if(a.phase === "vote") return `<h1 class="title-xl">🏅 꾸미기 시상식</h1>${phaseBar}
+      <div class="note big">가장 멋진 작품 <b>1개</b>를 골라 주세요. 내 작품에는 투표할 수 없어요. 결과 발표 전까지 바꿀 수 있어요.</div>
+      ${myRec().vote && Photos.data[myRec().vote] ? `<div class="good big">❤️ 투표했어요! 결과 발표를 기다려요.</div>` : ""}
+      ${gallery({vote:true})}`;
+  return `<h1 class="title-xl">🏅 꾸미기 시상식</h1>${phaseBar}<h2>🎉 축하해요!</h2>${podium()}
+    <h3 style="margin-top:20px">👏 모두 멋진 작품이에요</h3>${gallery({showName:true})}`;
+};
+
+/* ---------- 카메라 / 사진 처리 ---------- */
+let camStream = null, camShot = null;
+async function openCamera(){
+  camShot = null;
+  $("#modalHolder").innerHTML = `<div class="modal"><div class="card center" style="max-width:720px">
+    <h2>📷 슈팅디스크를 카메라 앞에 들어 주세요</h2>
+    <div style="position:relative;background:#222;border-radius:16px;overflow:hidden">
+      <video id="camV" autoplay playsinline muted style="width:100%;display:block"></video>
+      <img id="camI" class="hidden" style="width:100%;display:block"></div>
+    <div class="muted" style="margin:6px 0">얼굴은 나오지 않게, 작품만 크게!</div>
+    <div class="row" style="justify-content:center" id="camBtns">
+      <button class="btn" data-act="camshot">📸 찍기</button><button class="btn sec" data-act="camclose">닫기</button></div></div></div>`;
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1280}}, audio: false});
+    $("#camV").srcObject = camStream;
+  }catch(e){
+    $("#camBtns").innerHTML = `<div class="warn">카메라를 켤 수 없어요. 카메라 허용을 눌렀는지 확인하거나, [사진 파일 고르기]를 써 주세요.</div><button class="btn sec" data-act="camclose">닫기</button>`;
+  }
+}
+function closeCamera(){ if(camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; } $("#modalHolder").innerHTML = ""; }
+function toJpeg(src, maxSide = 640){
+  const w = src.videoWidth || src.naturalWidth || src.width, h = src.videoHeight || src.naturalHeight || src.height;
+  const k = Math.min(1, maxSide / Math.max(w, h));
+  const c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.72);
+}
+function savePhoto(dataUrl){
+  if(!okImg(dataUrl)){ toast("사진을 읽지 못했어요"); return; }
+  Photos.set(me.id, {name: me.name, num: me.num || "", img: dataUrl, t: Date.now()});
+  toast("사진을 올렸어요! 📸");
+}
+function handlePhotoFile(file){
+  if(!file || !/^image\//.test(file.type)){ toast("사진 파일을 골라 주세요"); return; }
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { try{ savePhoto(toJpeg(img)); } finally { URL.revokeObjectURL(url); } };
+  img.onerror = () => { URL.revokeObjectURL(url); toast("사진을 읽지 못했어요"); };
+  img.src = url;
+}
+
 V.rules = () => `<h1 class="title-xl">🦺 멀리 보내기 대회 규칙</h1>
   <div class="grid2">
     <div class="card"><h2>🏁 대회 방법</h2><ol class="big">
@@ -920,6 +1068,7 @@ function updateTop(){
 let pendingRender = false, lastKey = "";
 function viewKey(){
   const ch = curChapter();
+  if((ch === "decorate" || ch === "award") && !Photos.started) Photos.start();
   const st = S();
   const base = {ch, tp: teacherPresent(), set: st.settings, follow: st.follow, role, sv: role === "student" ? studentView : null, sim: simState};
   if(ch === "quiz") base.q = {quiz: st.quiz, stu: role === "teacher" ? Object.values(students()).map(s => s.quiz) : myRec().quiz};
@@ -927,6 +1076,7 @@ function viewKey(){
   if(ch === "test") base.t = role === "teacher" ? Object.values(students()).map(s => [s.name, s.status]) : myRec().status;
   if(ch === "contest") base.c = Object.values(students()).map(s => [s.name, s.num, s.rec]);
   if(ch === "mission") base.m = role === "teacher" ? Object.values(students()).map(s => s.mission) : myRec().mission;
+  if(ch === "decorate" || ch === "award"){ base.ph = Photos.ver; base.aw = st.award; base.v = Object.values(students()).map(s => [s.vote, s.name]); base.my = role === "student" ? myRec().vote : null; }
   if(ch === "finale") base.f = {feel: role === "teacher" ? Object.values(students()).map(s => s.feel) : myRec().feel, qf: st.quizF, stu: role === "teacher" ? Object.values(students()).map(s => s.quiz && s.quiz.q7) : (myRec().quiz && myRec().quiz.q7)};
   return JSON.stringify(base);
 }
@@ -1081,6 +1231,19 @@ document.addEventListener("click", async ev => {
       Sync.set("state/settings", {instructor: $("#sIns").value.trim(), intro: $("#sIntro").value.trim(), wind: $("#sWind").value, foldPic: (document.querySelector('input[name=sFold]:checked') || {}).value || "A", unit: $("#sUnit").value.trim() || "m"});
       simState.dir = null; $("#modalHolder").innerHTML = ""; toast("저장했어요"); setTimeout(() => render(true), 30); break;
     case "showqr": showQR(); break;
+    case "camopen": openCamera(); break;
+    case "camclose": closeCamera(); break;
+    case "camshot": {
+      const v = $("#camV"); if(!v || !v.videoWidth) break;
+      camShot = toJpeg(v); const im = $("#camI"); im.src = camShot; im.classList.remove("hidden"); v.classList.add("hidden");
+      $("#camBtns").innerHTML = `<button class="btn green" data-act="camsave">⬆️ 이 사진 올리기</button><button class="btn sec" data-act="camretake">🔁 다시 찍기</button>`; break; }
+    case "camretake": { camShot = null; $("#camI").classList.add("hidden"); $("#camV").classList.remove("hidden");
+      $("#camBtns").innerHTML = `<button class="btn" data-act="camshot">📸 찍기</button><button class="btn sec" data-act="camclose">닫기</button>`; break; }
+    case "camsave": if(camShot) savePhoto(camShot); closeCamera(); break;
+    case "vote": if(role === "student" && awardState().phase === "vote" && v !== me.id) sStu("vote", myRec().vote === v ? null : v); break;
+    case "aphase": Sync.set("state/award/phase", v); break;
+    case "delphoto": if(await askConfirm("이 사진을 지울까요?")){ Photos.set(v, null); Object.entries(students()).forEach(([id, st]) => { if(st.vote === v) Sync.set("students/" + id + "/vote", null); }); } break;
+    case "resetaward": if(await askConfirm("올라온 사진과 투표를 모두 지울까요?\n되돌릴 수 없어요.")){ Photos.clear(); Object.keys(students()).forEach(id => Sync.set("students/" + id + "/vote", null)); Sync.set("state/award", {phase:"upload"}); toast("지웠어요"); } break;
     case "zoom":
       $("#modalHolder").innerHTML = `<div class="modal" data-act="closemodal"><div class="card center" style="max-width:900px"><img src="${esc(b.dataset.src)}" style="width:100%;border-radius:14px"><div class="big" style="font-weight:800;margin-top:8px">${esc(b.dataset.cap)}</div><div class="muted">아무 곳이나 누르면 닫혀요</div></div></div>`; break;
     case "copylink": {
@@ -1088,7 +1251,7 @@ document.addEventListener("click", async ev => {
       try{ await navigator.clipboard.writeText(url); toast("복사했어요: " + url); }catch(e){ askText("이 주소를 복사해서 학생들에게 보내 주세요", url); }
       break; }
     case "resetroom":
-      if(await askConfirm("이 반의 학생 접속·퀴즈·기록을 모두 지울까요?\n되돌릴 수 없어요.")){ Sync.set("students", null); Sync.set("state/quiz", {idx:0, open:false, reveal:false}); Sync.set("state/quizF", {idx:7, open:false, reveal:false}); toast("초기화했어요"); }
+      if(await askConfirm("이 반의 학생 접속·퀴즈·기록을 모두 지울까요?\n되돌릴 수 없어요.")){ Sync.set("students", null); Sync.set("state/quiz", {idx:0, open:false, reveal:false}); Sync.set("state/quizF", {idx:7, open:false, reveal:false}); Sync.set("state/award", {phase:"upload"}); if(!Photos.started) Photos.start(); Photos.clear(); toast("초기화했어요"); }
       break;
     case "clearhelp": Sync.set("students/" + v + "/help", null); break;
     case "help": sStu("help", myRec().help ? null : Date.now()); break;
@@ -1157,6 +1320,7 @@ document.addEventListener("input", ev => {
 });
 document.addEventListener("change", ev => {
   const t = ev.target;
+  if(t.dataset.act === "photofile"){ handlePhotoFile(t.files && t.files[0]); t.value = ""; return; }
   if(t.dataset.rec){ const v = t.value === "" ? null : Number(t.value); Sync.set("students/" + t.dataset.rec + "/rec/" + t.dataset.r, v); }
 });
 document.addEventListener("keydown", ev => {
