@@ -320,11 +320,8 @@ const QUIZ = [
 function windWord(){ return getSettings().wind === "cw" ? "시계방향" : "반시계방향"; }
 function windDir(){ return getSettings().wind === "cw" ? 1 : -1; }
 const STEPS = [
-  {t:"실 끼우기", art:"hole", x:()=>"왕관 아래 기둥 가운데 구멍(빨간 동그라미)에 초록 실을 끼워요.", tips:["실 끝을 손가락으로 비비면 뾰족해져서 잘 들어가요."]},
-  {t:"매듭 묶기", art:"knot", x:()=>"끼운 실이 다시 빠지지 않게 매듭을 지어 묶어요.", tips:["매듭은 2번 묶으면 튼튼해요.", "w:매듭이 작으면 구멍으로 쏙 빠져요!"]},
-  {t:"11번 손잡이에 묶기", art:"tab", x:()=>"실의 반대쪽 끝을 11번 나무 손잡이 구멍에 넣고 매듭을 지어요.", tips:["11번은 나중에 잡아당기는 손잡이예요."]},
+  {t:"11번 손잡이에 묶기", art:"tab", x:()=>"기둥에 묶여 있는 초록 실의 반대쪽 끝을 11번 나무 손잡이 구멍에 넣고 매듭을 지어요.", tips:["11번은 나중에 잡아당기는 손잡이예요.", "매듭은 2번 묶어야 튼튼해요.", "w:매듭이 작으면 구멍으로 쏙 빠져요!"]},
   {t:"실 감기", art:"wind", x:()=>`왕관을 <b>위에서 내려다보면서</b> 실을 <b>${windWord()}</b>으로 끝까지 돌돌 감아요.`, tips:["w:감는 방향이 아주 중요해요! 선생님이 알려 준 방향 그대로!", "실이 꼬이지 않게 차곡차곡 감아요."]},
-  {t:"고무줄 꼬기", art:"band", x:()=>`실을 다 감은 상태 그대로, 고무줄을 <b>같은 방향(${windWord()})</b>으로 두 바퀴 꼬아요.`, tips:["고무줄 한쪽이 너무 길지 않게 팽팽함을 맞춰요."]},
   {t:"실을 홈에 넣고 테스트", art:"test", x:()=>"11번 손잡이에 연결된 실을 홈에 잘 넣고, 천천히 당겨서 왕관이 잘 도는지 확인해요.", tips:["왕관이 잘 돌면 성공! 실을 다시 감아 두세요.", "w:실이 홈에서 빠지면 헛돌아요."]},
   {t:"손잡이 스티커 맞춰 보기", art:"stk1", x:()=>"흰색 손잡이 스티커 2개를 떼어 내고, 손잡이 양옆에 모양이 맞는지 먼저 대 봐요.", tips:["붙이기 전에 먼저 맞춰 보면 실수하지 않아요."]},
   {t:"손잡이 스티커 붙이기", art:"stk2", x:()=>"뒷면 종이를 떼고 손잡이 양옆에 붙인 다음, 떨어지지 않게 손으로 꾹꾹 눌러요.", tips:["가장자리까지 꼼꼼히 눌러 주세요."]},
@@ -415,8 +412,8 @@ function stepArt(kind){
   switch(kind){
     case "hole":   return handleArt({hole:true, loose:true});
     case "knot":   return handleArt({knot:true, loose:true});
-    case "tab":    return handleArt({knot:true, tab:true});
-    case "wind":   return `<div class="row" style="justify-content:center;flex-wrap:nowrap">${handleArt({wound:true, tab:true, tabX:186})}<div>${rotArrow(d)}</div></div>`;
+    case "tab":    return handleArt({knot:true, tab:true, band:true});
+    case "wind":   return `<div class="row" style="justify-content:center;flex-wrap:nowrap">${handleArt({wound:true, tab:true, band:true, tabX:186})}<div>${rotArrow(d)}</div></div>`;
     case "band":   return `<div class="row" style="justify-content:center;flex-wrap:nowrap">${handleArt({wound:true, tab:true, band:true, tabX:186})}<div>${rotArrow(d)}<div class="center" style="font-weight:800">2바퀴</div></div></div>`;
     case "test":   return handleArt({wound:true, tab:true, band:true, pull:true, tabX:205, tabArrow:true});
     case "stk1":   return handleArt({wound:true, tab:true, band:true, stk:1});
@@ -519,7 +516,7 @@ V.intro = () => {
     <div class="card"><h2>1교시 <span class="tag">40분</span></h2><ol>
       <li><b>원리 탐구</b> — 왜 하늘로 뜰까? 실험실에서 직접 해 보기</li>
       <li><b>퀴즈</b> — 다 같이 풀어요</li>
-      <li><b>조립</b> — 실 묶기, 실 감기, 스티커, 원반 접기</li>
+      <li><b>조립</b> — 손잡이에 실 묶기, 실 감기, 스티커, 원반 접기</li>
       <li><b>첫 비행</b> — 잘 나는지 시험하고 고치기</li>
       <li><b>꾸미기</b> — 나만의 슈팅디스크</li></ol></div>
     <div class="card"><h2>2교시 <span class="tag">40분</span></h2><ol>
@@ -687,7 +684,7 @@ V.quiz = () => quizView("quiz");
 V.guide = () => `<h1 class="title-xl">📋 조립 전에 꼭 기억해요</h1>
   <div class="grid2">
     <div class="card"><h2>🔧 오늘 할 일</h2><ol class="big">
-      <li>실 묶기 (기둥 구멍 + 11번 손잡이)</li><li>실 감기 + 고무줄 꼬기</li><li>손잡이 스티커 붙이기</li><li>원반 날개 접기 + 돼지코 붙이기</li><li>날려 보기!</li></ol></div>
+      <li>11번 손잡이에 실 묶기</li><li>실 감기</li><li>손잡이 스티커 붙이기</li><li>원반 날개 접기 + 돼지코 붙이기</li><li>날려 보기!</li></ol></div>
     <div class="card"><h2>⭐ 약속 3가지</h2>
       <div class="warn big">① 실 감는 방향: 위에서 볼 때 <b>${windWord()}</b> ${rotArrow(windDir(), false).replace('width="110"', 'width="60" style="vertical-align:middle"')}</div>
       <div class="warn big">② 세 날개는 <b>모두 같은 방향</b>으로 접기</div>
@@ -733,7 +730,7 @@ const STATUS = {
   slow:  {em:"🐢", t:"왕관이 잘 안 돌아요"}
 };
 const FIX = {
-  press: ["실 감는 방향과 날개 방향이 서로 반대예요.", "👉 실을 <b>반대 방향</b>으로 다시 감아 보세요.", "👉 고무줄도 같은 반대 방향으로 2바퀴 꼬아요.", "그래도 안 되면 선생님을 불러요."],
+  press: ["실 감는 방향과 날개 방향이 서로 반대예요.", "👉 실을 <b>반대 방향</b>으로 다시 감아 보세요.", "그래도 안 되면 선생님을 불러요."],
   drop:  ["날개가 공기를 충분히 못 밀고 있어요.", "👉 날개 접는 선을 손톱으로 <b>꾹</b> 눌러서 다시 세워요.", "👉 실을 <b>끝까지</b> 감았는지 확인해요.", "👉 11번을 천천히 말고 <b>짧고 빠르게 확!</b> 당겨요."],
   wobble:["원반이 한쪽으로 기울었어요.", "👉 세 날개가 <b>똑같은 각도</b>인지 확인해요.", "👉 돼지코 스티커가 <b>가운데</b>에 붙었는지 봐요.", "👉 손잡이를 <b>똑바로 세워서</b> 당겨요."],
   slow:  ["왕관이 걸려서 잘 안 돌아요.", "👉 실이 <b>홈</b>에 잘 들어가 있는지 확인해요.", "👉 실이 꼬여 있으면 풀고 다시 감아요.", "👉 그래도 뻑뻑하면 [도와주세요]를 눌러요."]
@@ -960,6 +957,7 @@ function renderNav(){
     html += `<div class="grp">수업 도구</div>
       <button data-act="follow">${st.follow !== false ? "🔒 학생: 선생님 따라오기" : "🔓 학생: 자유 이동"}</button>
       <button data-act="settings">⚙️ 설정</button>
+      <button data-act="showqr">📱 학생 접속 QR</button>
       <button data-act="copylink">🔗 학생 접속 링크 복사</button>
       <button data-act="resetroom">🧹 반 기록 초기화</button>`;
   }
@@ -1003,6 +1001,24 @@ function dlg(msg, withInput, value){
   });
 }
 const askConfirm = m => dlg(m, false), askText = (m, v) => dlg(m, true, v);
+
+/* ---------- 학생 접속 QR ---------- */
+function studentURL(){ return location.origin + location.pathname + "?room=" + encodeURIComponent(Sync.room); }
+async function showQR(){
+  const url = studentURL();
+  $("#modalHolder").innerHTML = `<div class="modal"><div class="card center" style="max-width:760px">
+    <h2>📱 크롬북 카메라로 찍어서 들어와요</h2>
+    <div id="qrBox" style="display:inline-block;padding:18px;background:#fff;border-radius:18px;margin:8px 0;min-height:200px"></div>
+    <div class="big" style="font-weight:900">반 코드: ${esc(Sync.room)}</div>
+    <div class="muted" style="word-break:break-all;font-size:17px;margin:6px 0 14px">${esc(url)}</div>
+    <div class="row" style="justify-content:center"><button class="btn sec" data-act="copylink">🔗 링크 복사</button><button class="btn" data-act="closemodal">닫기</button></div></div></div>`;
+  try{
+    if(!window.qrcode) await Sync.loadScript("qrcode.js");
+    const qr = qrcode(0, "M"); qr.addData(url); qr.make();
+    $("#qrBox").innerHTML = qr.createSvgTag({cellSize: 9, margin: 2});
+    const svg = $("#qrBox svg"); if(svg){ svg.style.width = "380px"; svg.style.height = "380px"; }
+  }catch(e){ $("#qrBox").innerHTML = `<div class="muted" style="padding:40px">QR을 만들지 못했어요. 링크를 복사해서 보내 주세요.</div>`; }
+}
 
 /* ---------- 설정 창 ---------- */
 function openSettings(){
@@ -1053,6 +1069,7 @@ document.addEventListener("click", async ev => {
     case "savesettings":
       Sync.set("state/settings", {instructor: $("#sIns").value.trim(), intro: $("#sIntro").value.trim(), wind: $("#sWind").value, foldPic: (document.querySelector('input[name=sFold]:checked') || {}).value || "A", unit: $("#sUnit").value.trim() || "m"});
       simState.dir = null; $("#modalHolder").innerHTML = ""; toast("저장했어요"); setTimeout(() => render(true), 30); break;
+    case "showqr": showQR(); break;
     case "copylink": {
       const url = location.origin + location.pathname + "?room=" + encodeURIComponent(Sync.room);
       try{ await navigator.clipboard.writeText(url); toast("복사했어요: " + url); }catch(e){ askText("이 주소를 복사해서 학생들에게 보내 주세요", url); }
