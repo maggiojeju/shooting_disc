@@ -426,7 +426,7 @@ function stepArt(kind){
   }
   return "";
 }
-function bladeSide(match, angle, power){
+function bladeSide(match, angle, power, animate = true){
   // 날개 단면을 옆에서 본 그림. 날개는 오른쪽으로 움직임.
   const a = match ? angle : -angle;              // +: 앞쪽(오른쪽)이 위로 들림
   const rad = a * Math.PI / 180, L = 70;
@@ -437,8 +437,8 @@ function bladeSide(match, angle, power){
     for(let i = 0; i < n; i++){
       const x = 95 + i * 32;
       air += match
-        ? `<line x1="${x}" y1="118" x2="${x}" y2="170" stroke="#2f8cff" stroke-width="4" class="flow" style="animation-duration:${spd}s" marker-end="url(#bl)"/>`
-        : `<line x1="${x}" y1="62" x2="${x}" y2="12" stroke="#e5484d" stroke-width="4" class="flow" style="animation-duration:${spd}s" marker-end="url(#rd)"/>`;
+        ? `<line x1="${x}" y1="118" x2="${x}" y2="170" stroke="#2f8cff" stroke-width="4" class="${animate ? "flow" : ""}" stroke-dasharray="8 8" style="animation-duration:${spd}s" marker-end="url(#bl)"/>`
+        : `<line x1="${x}" y1="62" x2="${x}" y2="12" stroke="#e5484d" stroke-width="4" class="${animate ? "flow" : ""}" stroke-dasharray="8 8" style="animation-duration:${spd}s" marker-end="url(#rd)"/>`;
     }
   } else {
     air = `<text x="150" y="150" text-anchor="middle" font-size="16" fill="#7a6d62" font-weight="700">공기가 그냥 스쳐 지나가요</text>`;
@@ -571,10 +571,12 @@ V.compare = () => {
   <div class="good big center" style="margin-top:14px">⭐ 같은 점: 쭉 미는 힘을 <b>빙글빙글 도는 힘</b>으로 바꾸고, 도는 날개가 <b>공기를 아래로 밀어서</b> 떠요!</div></div>`;
 };
 V.direction = () => {
-  const s = simState.dir || (simState.dir = {dir:windDir(), fold:-windDir(), angle:35, power:.8, launched:false});
+  const s = simState.dir || (simState.dir = {dir:windDir(), fold:-windDir(), angle:35, power:.8, launched:false, spinning:false, lastLift:0, run:0});
   const f = flight(s);
-  const lift = s.launched ? (f.kind === "fly" ? -(40 + f.h * 150) : (f.kind === "weak" ? -12 : 0)) : 0;
-  const spinning = s.launched;
+  const flyLift = f.kind === "fly" ? -(40 + f.h * 150) : (f.kind === "weak" ? -12 : 0);
+  const spinning = !!s.spinning;
+  const lift = spinning ? flyLift : 0;
+  const fromLift = (!spinning && s.launched) ? (s.lastLift || 0) : 0;
   return `<h1 class="title-xl">🔄 원리③ 방향 실험실</h1>
   <p class="lead">실 감는 방향과 날개 접는 방향을 바꿔 보고, 원반이 날아오르는지 실험해 봐요!</p>
   <div class="grid2" style="grid-template-columns:1.1fr .9fr">
@@ -584,13 +586,13 @@ V.direction = () => {
           <div class="muted" style="font-size:14px">${s.dir > 0 ? "시계방향 ↻" : "반시계방향 ↺"} · 회색=접힌 쪽</div></div>
         <div class="center" style="width:48%;position:relative;height:300px;overflow:hidden">
           <div class="tag">옆에서 본 모습</div>
-          <div style="position:absolute;left:0;right:0;bottom:0;transition:transform 1.2s cubic-bezier(.2,.8,.2,1)" data-ty="${lift}"><div class="${s.launched && f.kind === "press" ? "shake" : ""}">
+          <div style="position:absolute;left:0;right:0;bottom:0;transition:transform ${spinning ? "1.2s cubic-bezier(.2,.8,.2,1)" : "1s ease-in"};transform:translateY(${fromLift}px)" data-ty="${lift}"><div class="${spinning && f.kind === "press" ? "shake" : ""}">
             <svg viewBox="0 0 220 40" width="100%"><ellipse cx="110" cy="20" rx="92" ry="11" fill="#fff" stroke="#9aa5b1" stroke-width="3"/><ellipse cx="110" cy="18" rx="16" ry="5" fill="#ffd4e0" stroke="#e58aa5" stroke-width="2"/></svg>
           </div></div>
         </div>
       </div>
-      <div class="svgbox" style="max-width:420px;margin:6px auto 0">${bladeSide(f.match, s.angle, s.power)}</div>
-      ${s.launched ? `<div class="result ${f.cls}">${f.msg}</div>` : `<div class="result" style="background:#f3ece2">아래 [슝! 당기기]를 눌러 보세요</div>`}
+      <div class="svgbox" style="max-width:420px;margin:6px auto 0">${bladeSide(f.match, s.angle, s.power, spinning)}</div>
+      ${s.launched ? `<div class="result ${f.cls}">${f.msg}${spinning ? "" : `<div style="font-size:16px;font-weight:700;opacity:.75;margin-top:4px">⏹ 회전이 멈췄어요${f.kind === "fly" ? " — 원반이 내려앉아요" : ""}</div>`}</div>` : `<div class="result" style="background:#f3ece2">아래 [슝! 당기기]를 눌러 보세요</div>`}
     </div>
     <div class="card ctrl">
       <label>① 원반이 도는 방향 <span class="muted" style="font-weight:600">(실을 반대로 감으면 반대로 돌아요)</span></label>
@@ -601,7 +603,11 @@ V.direction = () => {
       <input type="range" min="0" max="80" step="5" value="${s.angle}" data-act="angle">
       <label>④ 당기는 힘: <span id="powv">${s.power < .5 ? "살살" : s.power < .85 ? "보통" : "힘껏!"}</span></label>
       <input type="range" min="0.3" max="1" step="0.05" value="${s.power}" data-act="power">
-      <button class="btn" style="font-size:22px" data-act="launch">🚀 슝! 당기기</button>
+      <div class="row" style="flex-wrap:nowrap">
+        <button class="btn" style="font-size:22px;flex:1" data-act="launch">${s.launched ? "🔁 다시 당기기" : "🚀 슝! 당기기"}</button>
+        <button class="btn sec" style="font-size:22px" data-act="stopspin" ${spinning ? "" : "disabled"}>⏹ 멈추기</button>
+      </div>
+      <div class="muted" style="font-size:14px;margin-top:-6px">실제 원반처럼 4초쯤 돌다가 저절로 멈춰요.</div>
       <div class="note"><b>찾아보기</b><br>• 원반이 받침에 붙어 버리는 건 언제일까?<br>• 날개가 평평하면(0°) 어떻게 될까?<br>• 가장 높이 나는 각도는?</div>
     </div>
   </div>
@@ -1048,10 +1054,18 @@ document.addEventListener("click", async ev => {
     case "liftspin": simState.lift.spin = !simState.lift.spin; render(); break;
     case "cmpA": simState.cmp.a = simState.cmp.a === "go" ? "idle" : "go"; render(); break;
     case "cmpB": simState.cmp.b = simState.cmp.b === "go" ? "idle" : "go"; render(); break;
-    case "dirset": simState.dir.dir = Number(v); simState.dir.launched = false; render(); break;
-    case "foldset": simState.dir.fold = Number(v); simState.dir.launched = false; render(); break;
+    case "dirset": dirReset(); simState.dir.dir = Number(v); render(); break;
+    case "foldset": dirReset(); simState.dir.fold = Number(v); render(); break;
+    case "stopspin": dirStop(); break;
     case "launch":
-      simState.dir.launched = false; render(); setTimeout(() => { simState.dir.launched = true; render(); }, 60); break;
+      dirReset(); render();
+      setTimeout(() => {
+        const d = simState.dir, f = flight(d);
+        d.launched = true; d.spinning = true; d.run = (d.run || 0) + 1;
+        d.lastLift = f.kind === "fly" ? -(40 + f.h * 150) : (f.kind === "weak" ? -12 : 0);
+        const run = d.run; render();
+        clearTimeout(d.tid); d.tid = setTimeout(() => { if(simState.dir && simState.dir.run === run && simState.dir.spinning) dirStop(); }, 4000);
+      }, 60); break;
     /* 퀴즈 */
     case "answer":
       if(role !== "student") break;
@@ -1093,8 +1107,8 @@ document.addEventListener("click", async ev => {
 });
 document.addEventListener("input", ev => {
   const t = ev.target;
-  if(t.dataset.act === "angle"){ simState.dir.angle = Number(t.value); simState.dir.launched = false; $("#angv").textContent = t.value + "°"; clearTimeout(t._t); t._t = setTimeout(() => { render(); const el = document.querySelector('[data-act="angle"]'); if(el) el.focus(); }, 250); }
-  if(t.dataset.act === "power"){ simState.dir.power = Number(t.value); simState.dir.launched = false; const p = simState.dir.power; $("#powv").textContent = p < .5 ? "살살" : p < .85 ? "보통" : "힘껏!"; clearTimeout(t._t); t._t = setTimeout(() => { render(); }, 250); }
+  if(t.dataset.act === "angle"){ dirReset(); simState.dir.angle = Number(t.value); $("#angv").textContent = t.value + "°"; clearTimeout(t._t); t._t = setTimeout(() => { render(); const el = document.querySelector('[data-act="angle"]'); if(el) el.focus(); }, 250); }
+  if(t.dataset.act === "power"){ dirReset(); simState.dir.power = Number(t.value); const p = simState.dir.power; $("#powv").textContent = p < .5 ? "살살" : p < .85 ? "보통" : "힘껏!"; clearTimeout(t._t); t._t = setTimeout(() => { render(); }, 250); }
 });
 document.addEventListener("change", ev => {
   const t = ev.target;
@@ -1106,6 +1120,8 @@ document.addEventListener("keydown", ev => {
     else if($("#teachForm") && !$("#teachForm").classList.contains("hidden")) document.querySelector('[data-act="jointeach"]')?.click();
   }
 });
+function dirReset(){ const d = simState.dir; if(!d) return; clearTimeout(d.tid); d.launched = false; d.spinning = false; d.lastLift = 0; d.run = (d.run || 0) + 1; }
+function dirStop(){ const d = simState.dir; if(!d) return; clearTimeout(d.tid); d.spinning = false; render(); }
 function saveView(){ if(me) LS.set("sd_view_" + Sync.room + "_" + me.id, studentView); }
 
 Sync.on(t => { tree = t; if(following() && studentView.ch !== (S().chapter || "welcome")){ studentView.ch = S().chapter || "welcome"; saveView(); } render(); });
