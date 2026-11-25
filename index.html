@@ -307,7 +307,8 @@ const Photos = {
 
 /* ---------- 수업 구성 (챕터) ---------- */
 const CHAPTERS = [
-  {id:"welcome",  grp:"1교시", icon:"👋", name:"시작"},
+  {id:"teacher",  grp:"1교시", icon:"🙋", name:"강사 소개"},
+  {id:"welcome",  grp:"1교시", icon:"👋", name:"시연"},
   {id:"intro",    grp:"1교시", icon:"🗺️", name:"수업 소개"},
   {id:"lift",     grp:"1교시", icon:"🌬️", name:"원리① 왜 뜰까?"},
   {id:"compare",  grp:"1교시", icon:"🌀", name:"원리② 프로펠러 비교"},
@@ -368,8 +369,8 @@ const STEPS = [
 ];
 
 /* ---------- 상태 ---------- */
-let role = null, me = null, tree = {}, studentView = {ch:"welcome", step:0}, simState = {};
-const DEFAULT_SETTINGS = {instructor:"윤들", intro:"", wind:"cw", foldPic:"A", unit:"m"};
+let role = null, me = null, tree = {}, studentView = {ch:"teacher", step:0}, simState = {};
+const DEFAULT_SETTINGS = {instructor:"윤들", intro:"코딩과 인공지능, 드론을 가르치는 선생님이에요.\n오늘은 하늘을 나는 슈팅디스크를 함께 만들어요!", wind:"cw", foldPic:"A", unit:"m"};
 function foldPic(){ return getSettings().foldPic === "B" ? 1 : -1; }
 function getSettings(){ return Object.assign({}, DEFAULT_SETTINGS, (tree.state && tree.state.settings) || {}); }
 function S(){ return tree.state || {}; }
@@ -378,8 +379,8 @@ function myRec(){ return (me && students()[me.id]) || {}; }
 function teacherPresent(){ return !!tree.state; }
 function following(){ return role === "student" && teacherPresent() && S().follow !== false; }
 function curChapter(){
-  if(role === "teacher") return S().chapter || "welcome";
-  if(following()) return S().chapter || "welcome";
+  if(role === "teacher") return S().chapter || "teacher";
+  if(following()) return S().chapter || "teacher";
   return studentView.ch;
 }
 
@@ -539,16 +540,30 @@ V.welcome = () => {
   return `<div class="card center" style="padding:40px 20px">
     <div style="font-size:80px">🛸</div>
     <div class="title-xl">오늘은 슈팅디스크를 만들어요!</div>
-    <p class="lead">${st.instructor ? `강사: <b>${esc(st.instructor)}</b> 선생님` : "실을 확! 당기면 원반이 하늘로 슝~"}</p>
+    <p class="lead">실을 확! 당기면 원반이 하늘로 슝~</p>
     <div class="grid2" style="max-width:760px;margin:24px auto 0;text-align:left">
       <div class="card"><h3>👀 잘 보세요</h3>선생님이 두 가지 장난감을 날려 볼 거예요.<br><b>플라잉 프로펠러</b>와 <b>슈팅디스크</b>!</div>
       <div class="card"><h3>🤔 생각해 봐요</h3>두 장난감은 무엇이 같고, 무엇이 다를까요?</div>
     </div></div>`;
 };
+V.teacher = () => {
+  const st = getSettings();
+  return `<div class="card center" style="padding:44px 24px 34px">
+    <div style="font-size:84px;line-height:1">🙋</div>
+    <div class="lead" style="margin-top:10px">안녕하세요! 오늘 함께할 선생님은</div>
+    <div class="title-xl" style="font-size:64px;margin:6px 0 4px">${esc(st.instructor || "선생님")} 선생님</div>
+    ${st.intro ? `<p class="big" style="white-space:pre-line;max-width:760px;margin:10px auto 0">${esc(st.intro)}</p>` : ""}
+  </div>
+  <div class="card"><h2>🤝 오늘 선생님과의 약속</h2>
+    <div class="grid3">
+      <div class="center"><div style="font-size:46px">✋</div><b class="big">손 들고 말하기</b><br>궁금하면 언제든 손을 들어요</div>
+      <div class="center"><div style="font-size:46px">🪵</div><b class="big">부품은 살살</b><br>나무 부품은 잘 부러져요</div>
+      <div class="center"><div style="font-size:46px">🦺</div><b class="big">안전 먼저</b><br>원반은 사람이 없는 쪽으로</div>
+    </div></div>`;
+};
 V.intro = () => {
   const st = getSettings();
   return `<h1 class="title-xl">🗺️ 오늘 수업은 이렇게 해요</h1>
-  ${st.instructor || st.intro ? `<div class="card"><h3>🙋 강사 소개</h3><div class="big"><b>${esc(st.instructor || "")}</b> ${st.instructor ? "선생님" : ""}</div><div style="white-space:pre-line">${esc(st.intro || "")}</div></div>` : ""}
   <div class="timeline">
     <div class="card"><h2>1교시 <span class="tag">40분</span></h2><ol>
       <li><b>원리 탐구</b> — 왜 하늘로 뜰까? 실험실에서 직접 해 보기</li>
@@ -1052,7 +1067,7 @@ async function enter(r){
     if(!ex) Sync.set("students/" + me.id, {name: me.name, num: me.num || "", step: 0, joined: Date.now()});
     else { Sync.set("students/" + me.id + "/name", me.name); }
   } else {
-    if(!Sync.tree.state) Sync.set("state", {chapter:"welcome", follow:true, quiz:{idx:0, open:false, reveal:false}, quizF:{idx:7, open:false, reveal:false}, settings: DEFAULT_SETTINGS});
+    if(!Sync.tree.state) Sync.set("state", {chapter:"teacher", follow:true, quiz:{idx:0, open:false, reveal:false}, quizF:{idx:7, open:false, reveal:false}, settings: DEFAULT_SETTINGS});
   }
   updateTop();
   render(true);
@@ -1333,7 +1348,7 @@ function dirReset(){ const d = simState.dir; if(!d) return; clearTimeout(d.tid);
 function dirStop(){ const d = simState.dir; if(!d) return; clearTimeout(d.tid); d.spinning = false; render(); }
 function saveView(){ if(me) LS.set("sd_view_" + Sync.room + "_" + me.id, studentView); }
 
-Sync.on(t => { tree = t; if(following() && studentView.ch !== (S().chapter || "welcome")){ studentView.ch = S().chapter || "welcome"; saveView(); } render(); });
+Sync.on(t => { tree = t; if(following() && studentView.ch !== (S().chapter || "teacher")){ studentView.ch = S().chapter || "teacher"; saveView(); } render(); });
 renderLogin();
 </script>
 </body>
